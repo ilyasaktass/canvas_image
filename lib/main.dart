@@ -332,6 +332,7 @@ class _ImageLoaderState extends State<ImageLoader> {
     });
   }
 
+//deneme
   @override
   Widget build(BuildContext context) {
     if (backgroundImage == null) {
