@@ -8,7 +8,6 @@ import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_ffmpeg/flutter_ffmpeg.dart';
-import 'package:canvas_image/components/button_widget.dart';
 
 class RecordScreen extends StatefulWidget {
   const RecordScreen({super.key, this.sidebarWidth});

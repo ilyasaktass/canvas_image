@@ -1,8 +1,6 @@
 import 'package:canvas_image/enum/enums.dart';
 import 'package:flutter/material.dart';
 import 'package:canvas_image/record_screen/record_screen.dart';
-import 'package:canvas_image/canvas/canvas_view.dart';
-
 class CanvasSidebar extends StatefulWidget {
   final Function toggleMode;
   final Function clearAll;
