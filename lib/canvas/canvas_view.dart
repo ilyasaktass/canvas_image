@@ -1,14 +1,12 @@
 import 'dart:ui' as ui;
-
 import 'package:canvas_image/canvas/canvas_sidebar.dart';
+import 'package:canvas_image/constants/constants.dart';
 import 'package:canvas_image/enum/enums.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class DrawingBoard extends StatefulWidget {
-  final ui.Image backgroundImage;
-
-  const DrawingBoard({super.key, required this.backgroundImage});
+  const DrawingBoard({super.key});
 
   @override
   State<StatefulWidget> createState() {
@@ -17,6 +15,7 @@ class DrawingBoard extends StatefulWidget {
 }
 
 class _DrawingBoardState extends State<DrawingBoard> {
+  ui.Image? backgroundImage;
   List<List<DrawnShape>> _shapesHistory = [];
   int _historyIndex = -1;
   List<DrawnShape> _currentShapes = [];
@@ -27,10 +26,47 @@ class _DrawingBoardState extends State<DrawingBoard> {
   Alignment _imageAlignment = Alignment.topLeft;
   bool _isFilled = true; // Checkbox for filled shapes
   double _strokeWidth = 5.0; // Slider for stroke width
+  int _currentImageIndex = 1;
+  final List<String> _images = [
+    'assets/image1.png',
+    'assets/image2.png',
+    'assets/image3.png',
+    'assets/image4.png',
+    'assets/image5.png',
+  ];
+
+  ui.PictureRecorder? _recorder;
+  Canvas? _canvas;
+  ui.Picture? _picture;
+  bool _isRecording = false;
+
   @override
   void initState() {
     super.initState();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky); // Hide system UI
+    loadImage();
+  }
+
+  Future<void> loadImage() async {
+    final ByteData data = await rootBundle.load(_images[_currentImageIndex]);
+    final Uint8List bytes = data.buffer.asUint8List();
+    final ui.Image image = await decodeImageFromList(bytes);
+
+    setState(() {
+      backgroundImage = image;
+    });
+  }
+
+  void _changeImageBackground(int increment) {
+    setState(() {
+      _currentImageIndex += increment;
+      if (_currentImageIndex < 0) {
+        _currentImageIndex = _images.length - 1;
+      } else if (_currentImageIndex >= _images.length) {
+        _currentImageIndex = 0;
+      }
+      loadImage();
+    });
   }
 
   void toggleMode(DrawingMode mode) {
@@ -44,11 +80,19 @@ class _DrawingBoardState extends State<DrawingBoard> {
       _selectedColor = color;
     });
   }
+
   void _undo() {
     if (_historyIndex > 0) {
       setState(() {
         _historyIndex--;
         _currentShapes = List.from(_shapesHistory[_historyIndex]);
+        _redrawFromHistory();
+      });
+    } else if (_historyIndex == 0) {
+      setState(() {
+        _historyIndex--;
+        _currentShapes = [];
+        _redrawFromHistory();
       });
     }
   }
@@ -58,8 +102,19 @@ class _DrawingBoardState extends State<DrawingBoard> {
       setState(() {
         _historyIndex++;
         _currentShapes = List.from(_shapesHistory[_historyIndex]);
+        _redrawFromHistory();
       });
     }
+  }
+
+  void _redrawFromHistory() {
+    _recorder = ui.PictureRecorder();
+    _canvas = Canvas(_recorder!);
+    for (var shape in _currentShapes) {
+      _drawShape(shape);
+    }
+    _picture = _recorder?.endRecording();
+    setState(() {});
   }
 
   void _zoomIn() {
@@ -105,18 +160,22 @@ class _DrawingBoardState extends State<DrawingBoard> {
       _shapesHistory = [];
       _currentShapes = [];
       _historyIndex = -1;
+      _picture = null;
     });
   }
-  void _toggleIsFilled(bool? value){
+
+  void _toggleIsFilled(bool? value) {
     setState(() {
       _isFilled = value!;
     });
   }
-  void _updateStrokeWidth(double value){
+
+  void _updateStrokeWidth(double value) {
     setState(() {
       _strokeWidth = value;
     });
   }
+
   void _onPanStart(DragStartDetails details) {
     RenderBox renderBox = context.findRenderObject() as RenderBox;
     Offset point = renderBox.globalToLocal(details.localPosition);
@@ -126,6 +185,10 @@ class _DrawingBoardState extends State<DrawingBoard> {
       setState(() {
         _currentShapes.add(DrawnShape(point, point, _drawingMode,
             _selectedColor, _isFilled, _strokeWidth));
+        _isRecording = true;
+        _recorder = ui.PictureRecorder();
+        _canvas = Canvas(_recorder!);
+        _drawShape(_currentShapes.last);
       });
     }
   }
@@ -142,8 +205,10 @@ class _DrawingBoardState extends State<DrawingBoard> {
         if (_drawingMode == DrawingMode.pen) {
           _currentShapes.add(DrawnShape(_currentShapes.last.end, point,
               _drawingMode, _selectedColor, _isFilled, _strokeWidth));
+          _drawShape(_currentShapes.last);
         } else {
           _currentShapes.last.end = point;
+          _drawShape(_currentShapes.last);
         }
       }
     });
@@ -153,25 +218,64 @@ class _DrawingBoardState extends State<DrawingBoard> {
     _startPoint = null;
     if (_historyIndex == -1 || _historyIndex == _shapesHistory.length - 1) {
       _shapesHistory.add(List.from(_currentShapes));
+      _historyIndex++;
     } else {
       _shapesHistory = _shapesHistory.sublist(0, _historyIndex + 1);
       _shapesHistory.add(List.from(_currentShapes));
+      _historyIndex++;
     }
-    _historyIndex = _shapesHistory.length - 1;
+    if (_isRecording) {
+      _picture = _recorder?.endRecording();
+      _isRecording = false;
+    }
     setState(() {});
+  }
+
+  void _drawShape(DrawnShape shape) {
+    if (_canvas == null) return;
+    Paint paint = Paint()
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = shape.strokeWidth
+      ..color = shape.color
+      ..style = shape.isFilled ? PaintingStyle.fill : PaintingStyle.stroke;
+
+    // Çizimleri direkt canvas üzerinde çizme
+    Offset scaledStart = shape.start;
+    Offset scaledEnd = shape.end;
+
+    switch (shape.mode) {
+      case DrawingMode.pen:
+        _canvas!.drawLine(scaledStart, scaledEnd, paint);
+        break;
+      case DrawingMode.rectangle:
+        _canvas!.drawRect(Rect.fromPoints(scaledStart, scaledEnd), paint);
+        break;
+      case DrawingMode.circle:
+        double radius = (scaledStart - scaledEnd).distance / 2;
+        Offset center = (scaledStart + scaledEnd) / 2;
+        _canvas!.drawCircle(center, radius, paint);
+        break;
+      case DrawingMode.line:
+        _canvas!.drawLine(scaledStart, scaledEnd, paint);
+        break;
+      // Polygon drawing can be added here.
+      default:
+        break;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(110),
+        preferredSize: const Size.fromHeight(toolbarHeight),
         child: AppBar(
-          backgroundColor: Colors.blueGrey,
+          backgroundColor: ui.Color.fromARGB(75, 54, 110, 143),
           flexibleSpace: Padding(
             padding: const EdgeInsets.fromLTRB(5, 5, 0, 0),
             child: CanvasSidebar(
               toggleMode: toggleMode,
+              drawingMode: _drawingMode,
               clearAll: _clearAll,
               undo: _undo,
               redo: _redo,
@@ -182,26 +286,38 @@ class _DrawingBoardState extends State<DrawingBoard> {
               alignTopCenter: _alignTopCenter,
               alignTopRight: _alignTopRight,
               selectColor: selectColor,
+              selectedColor: _selectedColor,
               strokeWidth: _strokeWidth,
               isFilled: _isFilled,
+              imageAlignment: _imageAlignment,
               toggleIsFilled: _toggleIsFilled,
               updateStrokeWidth: _updateStrokeWidth,
+              changeImageBackground: _changeImageBackground,
             ),
           ),
         ),
       ),
-      body: GestureDetector(
-        onPanStart: _onPanStart,
-        onPanUpdate: _onPanUpdate,
-        onPanEnd: _onPanEnd,
-        child: Center(
-          child: CustomPaint(
-            painter: DrawingPainter(_currentShapes, widget.backgroundImage,
-                _zoomLevel, _imageAlignment),
-            size: Size.infinite,
-          ),
-        ),
-      ),
+      body: backgroundImage == null
+          ? const Center(child: CircularProgressIndicator())
+          : GestureDetector(
+              onPanStart: _onPanStart,
+              onPanUpdate: _onPanUpdate,
+              onPanEnd: _onPanEnd,
+              child: Center(
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    painter: DrawingPainter(
+                      shapes: _currentShapes,
+                      backgroundImage: backgroundImage!,
+                      zoomLevel: _zoomLevel,
+                      imageAlignment: _imageAlignment,
+                      picture: _picture,
+                    ),
+                    size: Size.infinite,
+                  ),
+                ),
+              ),
+            ),
     );
   }
 }
@@ -222,8 +338,15 @@ class DrawingPainter extends CustomPainter {
   final ui.Image backgroundImage;
   final double zoomLevel;
   final Alignment imageAlignment;
+  final ui.Picture? picture;
 
-  DrawingPainter(this.shapes, this.backgroundImage, this.zoomLevel, this.imageAlignment);
+  DrawingPainter({
+    required this.shapes,
+    required this.backgroundImage,
+    required this.zoomLevel,
+    required this.imageAlignment,
+    this.picture,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -248,6 +371,10 @@ class DrawingPainter extends CustomPainter {
       Rect.fromLTWH(offset.dx, offset.dy, scaledWidth, scaledHeight),
       Paint(),
     );
+
+    if (picture != null) {
+      canvas.drawPicture(picture!);
+    }
 
     for (var shape in shapes) {
       Paint paint = Paint()
@@ -285,5 +412,3 @@ class DrawingPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
-
-

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:async';
+import 'package:canvas_image/constants/constants.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:ed_screen_recorder/ed_screen_recorder.dart';
@@ -22,8 +23,9 @@ class _RecordScreenState extends State<RecordScreen> {
   EdScreenRecorder? screenRecorder;
   final FlutterFFmpeg _flutterFFmpeg = FlutterFFmpeg();
   bool inProgress = false;
+  bool isPaused = false; // Pause durumu için bir state değişkeni ekleyin
   late String _fileName;
-  late Timer _timer;
+  Timer? _timer;
   int _start = 0;
 
   void startTimer() {
@@ -39,16 +41,19 @@ class _RecordScreenState extends State<RecordScreen> {
   }
 
   void stopTimer() {
+    _timer?.cancel();
     setState(() {
-       _start = 0;
-       _timer.cancel();
+      _start = 0;
     });
-    
+  }
+
+  void pauseTimer() {
+    _timer?.cancel();
   }
 
   @override
   void dispose() {
-    _timer.cancel();
+    _timer?.cancel();
     super.dispose();
   }
 
@@ -72,6 +77,10 @@ class _RecordScreenState extends State<RecordScreen> {
       {required double width, required double height}) async {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     try {
+      setState(() {
+        isPaused = false;
+      });
+      stopTimer();
       startTimer();
       final fileName = 'video_${DateTime.now().millisecondsSinceEpoch}';
       String dirPath = (await getTemporaryDirectory()).path;
@@ -84,6 +93,9 @@ class _RecordScreenState extends State<RecordScreen> {
           dirPathToSave: dirPath,
         );
         setFileName(fileName);
+        setState(() {
+          inProgress = true;
+        });
       }
     } on PlatformException catch (e) {
       printError("An error occurred while starting the recording: $e");
@@ -98,9 +110,9 @@ class _RecordScreenState extends State<RecordScreen> {
 
   Future<void> stopRecord() async {
     try {
-      stopTimer();
       var stopResponse = await screenRecorder?.stopRecord();
       if (stopResponse != null) {
+        stopTimer(); // Timer'ı durdur
         File file = File(stopResponse.file.path);
         if (!await file.exists()) {
           debugPrint("File does not exist.");
@@ -112,13 +124,17 @@ class _RecordScreenState extends State<RecordScreen> {
           printError("External storage directory is null.");
           return;
         }
-        
+
         final String outputPath = '${directory.path}/$_fileName.mp4';
-        double cropY = (kToolbarHeight+30);
-        double cropWidth =MediaQuery.of(context).size.width;
-        double cropHeight = MediaQuery.of(context).size.height-cropY;
-        cropVideo(
-            file.path, outputPath, cropWidth.toInt(), cropHeight.toInt(), 0, cropY);
+        double cropY = toolbarHeight;
+        double cropWidth = MediaQuery.of(context).size.width;
+        double cropHeight = MediaQuery.of(context).size.height - cropY;
+        cropVideo(file.path, outputPath, cropWidth.toInt(), cropHeight.toInt(),
+            0, cropY);
+        setState(() {
+          inProgress = false;
+          isPaused = false;
+        });
       } else {
         debugPrint("Error: File does not exist.");
       }
@@ -130,6 +146,10 @@ class _RecordScreenState extends State<RecordScreen> {
   Future<void> pauseRecord() async {
     try {
       await screenRecorder?.pauseRecord();
+      pauseTimer(); // Timer'ı durdur
+      setState(() {
+        isPaused = true;
+      });
     } on PlatformException catch (e) {
       kDebugMode
           ? debugPrint("Error: An error occurred while pause recording: $e")
@@ -140,6 +160,10 @@ class _RecordScreenState extends State<RecordScreen> {
   Future<void> resumeRecord() async {
     try {
       await screenRecorder?.resumeRecord();
+      startTimer(); // Timer'ı yeniden başlat
+      setState(() {
+        isPaused = false;
+      });
     } on PlatformException catch (e) {
       kDebugMode
           ? debugPrint("Error: An error occurred while resume recording: $e")
@@ -155,7 +179,7 @@ class _RecordScreenState extends State<RecordScreen> {
 
   void cropVideo(String inputPath, String outputPath, int cropWidth,
       int cropHeight, int videoCropX, double videoCropY) async {
-   String command =
+    String command =
         '-i $inputPath -vf "crop=$cropWidth:$cropHeight:$videoCropX:$videoCropY" -c:v mpeg4 -b:v 1M -pix_fmt yuv420p $outputPath';
 
     int returnCode = await _flutterFFmpeg.execute(command);
@@ -174,40 +198,55 @@ class _RecordScreenState extends State<RecordScreen> {
 
     return Text(
       '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}',
-      style: const TextStyle(fontSize: 13, color: Colors.red),
+      style: const TextStyle(
+          fontSize: 15, fontWeight: FontWeight.bold, color: Colors.red),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Wrap(
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        Wrap(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.mic),
-              color: Colors.green,
-              onPressed: () {
-                startRecord(
-                    width: MediaQuery.of(context).size.width,
-                    height: MediaQuery.of(context).size.height);
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.play_arrow),
-              onPressed: () {},
-            ),
-            IconButton(
-              icon: const Icon(Icons.stop),
-              onPressed: stopRecord,
-            ),
-            IconButton(
-              icon: const Icon(Icons.pause),
-              onPressed: pauseRecord,
-            ),
-          ],
-        ),
+        if (!inProgress)
+          IconButton(
+            icon: const Icon(Icons.mic),
+            color: Colors.red,
+            onPressed: () {
+              startRecord(
+                  width: MediaQuery.of(context).size.width,
+                  height: MediaQuery.of(context).size.height);
+            },
+          ),
+        if (inProgress)
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            color: Colors.green,
+            onPressed: () {
+              startRecord(
+                  width: MediaQuery.of(context).size.width,
+                  height: MediaQuery.of(context).size.height);
+            },
+          ),
+        if (inProgress && !isPaused)
+          IconButton(
+            icon: const Icon(Icons.pause),
+            color: Colors.blue,
+            onPressed: pauseRecord,
+          ),
+        if (inProgress && isPaused)
+          IconButton(
+            icon: const Icon(Icons.play_arrow),
+            color: Colors.blue,
+            onPressed: resumeRecord,
+          ),
+        if (inProgress)
+          IconButton(
+            icon: const Icon(Icons.stop),
+            color: Colors.red,
+            onPressed: stopRecord,
+          ),
         if (_start != 0) buildTimerText(_start),
       ],
     );
