@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:async';
-import 'package:canvas_image/constants/constants.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:ed_screen_recorder/ed_screen_recorder.dart';
@@ -9,6 +8,8 @@ import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_ffmpeg/flutter_ffmpeg.dart';
+import 'package:canvas_image/constants/constants.dart';
+import 'package:canvas_image/tools/easy_loading_widget.dart';
 
 class RecordScreen extends StatefulWidget {
   const RecordScreen({super.key, this.sidebarWidth});
@@ -23,7 +24,8 @@ class _RecordScreenState extends State<RecordScreen> {
   EdScreenRecorder? screenRecorder;
   final FlutterFFmpeg _flutterFFmpeg = FlutterFFmpeg();
   bool inProgress = false;
-  bool isPaused = false; // Pause durumu için bir state değişkeni ekleyin
+  bool isPaused = false;
+  bool isProcessing = false;
   late String _fileName;
   Timer? _timer;
   int _start = 0;
@@ -109,36 +111,48 @@ class _RecordScreenState extends State<RecordScreen> {
   }
 
   Future<void> stopRecord() async {
+    setState(() {
+      inProgress = false;
+      isProcessing = true;
+    });
+
+    EasyLoadingWidget.show(message: "Processing...");
     try {
       var stopResponse = await screenRecorder?.stopRecord();
       if (stopResponse != null) {
         stopTimer(); // Timer'ı durdur
         File file = File(stopResponse.file.path);
         if (!await file.exists()) {
+          EasyLoadingWidget.dismiss();
           debugPrint("File does not exist.");
           return;
         }
 
         Directory? directory = await getExternalStorageDirectory();
         if (directory == null) {
+          EasyLoadingWidget.dismiss();
           printError("External storage directory is null.");
           return;
         }
 
         final String outputPath = '${directory.path}/$_fileName.mp4';
-        double cropY = toolbarHeight;
-        double cropWidth = MediaQuery.of(context).size.width;
-        double cropHeight = MediaQuery.of(context).size.height - cropY;
-        cropVideo(file.path, outputPath, cropWidth.toInt(), cropHeight.toInt(),
-            0, cropY);
+        double cropWidth = MediaQuery.of(context).size.width-sidebarWidth;
+        double cropHeight = MediaQuery.of(context).size.height;
+
+        await cropVideo(file.path, outputPath, cropWidth.toInt(),
+            cropHeight.toInt(), 0, 0);
+
         setState(() {
-          inProgress = false;
+          isProcessing = false;
           isPaused = false;
         });
+        EasyLoadingWidget.dismiss();
       } else {
+        EasyLoadingWidget.dismiss();
         debugPrint("Error: File does not exist.");
       }
     } on PlatformException catch (e) {
+      EasyLoadingWidget.dismiss();
       printError("An error occurred while stopping the recording: $e");
     }
   }
@@ -177,18 +191,21 @@ class _RecordScreenState extends State<RecordScreen> {
     }
   }
 
-  void cropVideo(String inputPath, String outputPath, int cropWidth,
+  Future<void> cropVideo(String inputPath, String outputPath, int cropWidth,
       int cropHeight, int videoCropX, double videoCropY) async {
     String command =
-        '-i $inputPath -vf "crop=$cropWidth:$cropHeight:$videoCropX:$videoCropY" -c:v mpeg4 -b:v 1M -pix_fmt yuv420p $outputPath';
+        '-i $inputPath -vf "crop=$cropWidth:$cropHeight:$videoCropX:$videoCropY" -c:v mpeg4 -b:v 2M -pix_fmt yuv420p $outputPath';
 
     int returnCode = await _flutterFFmpeg.execute(command);
 
     if (returnCode == 0) {
-      OpenFile.open(outputPath);
+      await OpenFile.open(outputPath);
+      EasyLoadingWidget.showSuccess(message: "İşlem başarılı.");
     } else {
+      EasyLoadingWidget.showError(message: "Hata oluştu.");
       debugPrint('Video kırpma işlemi sırasında bir hata oluştu.');
     }
+    EasyLoadingWidget.dismiss();
   }
 
   Widget buildTimerText(int seconds) {
@@ -205,49 +222,53 @@ class _RecordScreenState extends State<RecordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      alignment: WrapAlignment.center,
-      crossAxisAlignment: WrapCrossAlignment.center,
+    return Stack(
       children: [
-        if (!inProgress)
-          IconButton(
-            icon: const Icon(Icons.mic),
-            color: Colors.red,
-            onPressed: () {
-              startRecord(
-                  width: MediaQuery.of(context).size.width,
-                  height: MediaQuery.of(context).size.height);
-            },
-          ),
-        if (inProgress)
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            color: Colors.green,
-            onPressed: () {
-              startRecord(
-                  width: MediaQuery.of(context).size.width,
-                  height: MediaQuery.of(context).size.height);
-            },
-          ),
-        if (inProgress && !isPaused)
-          IconButton(
-            icon: const Icon(Icons.pause),
-            color: Colors.blue,
-            onPressed: pauseRecord,
-          ),
-        if (inProgress && isPaused)
-          IconButton(
-            icon: const Icon(Icons.play_arrow),
-            color: Colors.blue,
-            onPressed: resumeRecord,
-          ),
-        if (inProgress)
-          IconButton(
-            icon: const Icon(Icons.stop),
-            color: Colors.red,
-            onPressed: stopRecord,
-          ),
-        if (_start != 0) buildTimerText(_start),
+        Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            if (!inProgress && !isProcessing)
+              IconButton(
+                icon: const Icon(Icons.mic),
+                color: Colors.red,
+                onPressed: () {
+                  startRecord(
+                      width: MediaQuery.of(context).size.width,
+                      height: MediaQuery.of(context).size.height);
+                },
+              ),
+            if (inProgress)
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                color: Colors.green,
+                onPressed: () {
+                  startRecord(
+                      width: MediaQuery.of(context).size.width,
+                      height: MediaQuery.of(context).size.height);
+                },
+              ),
+            if (inProgress && !isPaused)
+              IconButton(
+                icon: const Icon(Icons.pause),
+                color: Colors.blue,
+                onPressed: pauseRecord,
+              ),
+            if (inProgress && isPaused)
+              IconButton(
+                icon: const Icon(Icons.play_arrow),
+                color: Colors.blue,
+                onPressed: resumeRecord,
+              ),
+            if (inProgress)
+              IconButton(
+                icon: const Icon(Icons.stop),
+                color: Colors.red,
+                onPressed: stopRecord,
+              ),
+            if (_start != 0) buildTimerText(_start),
+          ],
+        ),
       ],
     );
   }

@@ -1,5 +1,5 @@
 import 'dart:ui' as ui;
-import 'package:canvas_image/canvas/canvas_sidebar.dart';
+import 'package:canvas_image/canvas/sidebar/canvas_sidebar.dart';
 import 'package:canvas_image/constants/constants.dart';
 import 'package:canvas_image/enum/enums.dart';
 import 'package:flutter/material.dart';
@@ -24,7 +24,7 @@ class _DrawingBoardState extends State<DrawingBoard> {
   Color _selectedColor = Colors.black; // Default color
   double _zoomLevel = 1.0;
   Alignment _imageAlignment = Alignment.topLeft;
-  bool _isFilled = true; // Checkbox for filled shapes
+  bool _isFilled = false; // Checkbox for filled shapes
   double _strokeWidth = 5.0; // Slider for stroke width
   int _currentImageIndex = 1;
   final List<String> _images = [
@@ -39,11 +39,13 @@ class _DrawingBoardState extends State<DrawingBoard> {
   Canvas? _canvas;
   ui.Picture? _picture;
   bool _isRecording = false;
+  final double _sidebarWidth = sidebarWidth;
 
   @override
   void initState() {
     super.initState();
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky); // Hide system UI
+    SystemChrome.setEnabledSystemUIMode(
+        SystemUiMode.immersiveSticky); // Hide system UI
     loadImage();
   }
 
@@ -108,13 +110,15 @@ class _DrawingBoardState extends State<DrawingBoard> {
   }
 
   void _redrawFromHistory() {
-    _recorder = ui.PictureRecorder();
-    _canvas = Canvas(_recorder!);
-    for (var shape in _currentShapes) {
-      _drawShape(shape);
+    if (_recorder != null && _canvas != null) {
+      _recorder = ui.PictureRecorder();
+      _canvas = Canvas(_recorder!);
+      for (var shape in _currentShapes) {
+        _drawShape(shape);
+      }
+      _picture = _recorder?.endRecording();
+      setState(() {});
     }
-    _picture = _recorder?.endRecording();
-    setState(() {});
   }
 
   void _zoomIn() {
@@ -199,8 +203,8 @@ class _DrawingBoardState extends State<DrawingBoard> {
 
     setState(() {
       if (_drawingMode == DrawingMode.eraser) {
-        _currentShapes
-            .removeWhere((shape) => (shape.start - point).distance < 30);
+        _currentShapes.removeWhere((shape) => _isPointInShape(point, shape));
+        _redrawFromHistory();
       } else if (_startPoint != null) {
         if (_drawingMode == DrawingMode.pen) {
           _currentShapes.add(DrawnShape(_currentShapes.last.end, point,
@@ -208,7 +212,7 @@ class _DrawingBoardState extends State<DrawingBoard> {
           _drawShape(_currentShapes.last);
         } else {
           _currentShapes.last.end = point;
-          _drawShape(_currentShapes.last);
+          _redrawFromHistory();
         }
       }
     });
@@ -229,6 +233,24 @@ class _DrawingBoardState extends State<DrawingBoard> {
       _isRecording = false;
     }
     setState(() {});
+  }
+
+  bool _isPointInShape(Offset point, DrawnShape shape) {
+    switch (shape.mode) {
+      case DrawingMode.pen:
+      case DrawingMode.line:
+        return (shape.start - point).distance <= _strokeWidth ||
+            (shape.end - point).distance <= _strokeWidth;
+      case DrawingMode.rectangle:
+        Rect rect = Rect.fromPoints(shape.start, shape.end);
+        return rect.contains(point);
+      case DrawingMode.circle:
+        double radius = (shape.start - shape.end).distance / 2;
+        Offset center = (shape.start + shape.end) / 2;
+        return (center - point).distance <= radius;
+      default:
+        return false;
+    }
   }
 
   void _drawShape(DrawnShape shape) {
@@ -267,57 +289,74 @@ class _DrawingBoardState extends State<DrawingBoard> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(toolbarHeight),
-        child: AppBar(
-          backgroundColor: ui.Color.fromARGB(75, 54, 110, 143),
-          flexibleSpace: Padding(
-            padding: const EdgeInsets.fromLTRB(5, 5, 0, 0),
-            child: CanvasSidebar(
-              toggleMode: toggleMode,
-              drawingMode: _drawingMode,
-              clearAll: _clearAll,
-              undo: _undo,
-              redo: _redo,
-              zoomIn: _zoomIn,
-              zoomOut: _zoomOut,
-              resetZoom: _resetZoom,
-              alignTopLeft: _alignTopLeft,
-              alignTopCenter: _alignTopCenter,
-              alignTopRight: _alignTopRight,
-              selectColor: selectColor,
-              selectedColor: _selectedColor,
-              strokeWidth: _strokeWidth,
-              isFilled: _isFilled,
-              imageAlignment: _imageAlignment,
-              toggleIsFilled: _toggleIsFilled,
-              updateStrokeWidth: _updateStrokeWidth,
-              changeImageBackground: _changeImageBackground,
-            ),
-          ),
-        ),
-      ),
-      body: backgroundImage == null
-          ? const Center(child: CircularProgressIndicator())
-          : GestureDetector(
-              onPanStart: _onPanStart,
-              onPanUpdate: _onPanUpdate,
-              onPanEnd: _onPanEnd,
-              child: Center(
-                child: RepaintBoundary(
-                  child: CustomPaint(
-                    painter: DrawingPainter(
-                      shapes: _currentShapes,
-                      backgroundImage: backgroundImage!,
-                      zoomLevel: _zoomLevel,
-                      imageAlignment: _imageAlignment,
-                      picture: _picture,
+      body: Stack(
+        children: [
+          backgroundImage == null
+              ? const Center(child: CircularProgressIndicator())
+              : GestureDetector(
+                  onPanStart: _onPanStart,
+                  onPanUpdate: _onPanUpdate,
+                  onPanEnd: _onPanEnd,
+                  child: Center(
+                    child: RepaintBoundary(
+                      child: CustomPaint(
+                        painter: DrawingPainter(
+                          shapes: _currentShapes,
+                          backgroundImage: backgroundImage!,
+                          zoomLevel: _zoomLevel,
+                          imageAlignment: _imageAlignment,
+                          picture: _picture,
+                          sidebarWidth: _sidebarWidth,
+                        ),
+                        size: Size.infinite,
+                      ),
                     ),
-                    size: Size.infinite,
                   ),
                 ),
+          Positioned(
+            top: 0,
+            bottom: 0,
+            right: 0,
+            child: Container(
+              width: _sidebarWidth, // Sidebar width
+              decoration: BoxDecoration(
+                color: const ui.Color.fromARGB(
+                    255, 180, 170, 170), // Color moved to BoxDecoration
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black
+                        .withOpacity(0.3), // Shadow color with opacity
+                    spreadRadius: 2, // Spread radius
+                    blurRadius: 5, // Blur radius
+                    offset: const Offset(-2, 0), // Shadow offset (x, y)
+                  ),
+                ],
+              ),
+              child: CanvasSidebar(
+                toggleMode: toggleMode,
+                drawingMode: _drawingMode,
+                clearAll: _clearAll,
+                undo: _undo,
+                redo: _redo,
+                zoomIn: _zoomIn,
+                zoomOut: _zoomOut,
+                resetZoom: _resetZoom,
+                alignTopLeft: _alignTopLeft,
+                alignTopCenter: _alignTopCenter,
+                alignTopRight: _alignTopRight,
+                selectColor: selectColor,
+                selectedColor: _selectedColor,
+                strokeWidth: _strokeWidth,
+                isFilled: _isFilled,
+                imageAlignment: _imageAlignment,
+                toggleIsFilled: _toggleIsFilled,
+                updateStrokeWidth: _updateStrokeWidth,
+                changeImageBackground: _changeImageBackground,
               ),
             ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -330,7 +369,8 @@ class DrawnShape {
   bool isFilled;
   double strokeWidth;
 
-  DrawnShape(this.start, this.end, this.mode, this.color, this.isFilled, this.strokeWidth);
+  DrawnShape(this.start, this.end, this.mode, this.color, this.isFilled,
+      this.strokeWidth);
 }
 
 class DrawingPainter extends CustomPainter {
@@ -339,6 +379,7 @@ class DrawingPainter extends CustomPainter {
   final double zoomLevel;
   final Alignment imageAlignment;
   final ui.Picture? picture;
+  final double sidebarWidth;
 
   DrawingPainter({
     required this.shapes,
@@ -346,6 +387,7 @@ class DrawingPainter extends CustomPainter {
     required this.zoomLevel,
     required this.imageAlignment,
     this.picture,
+    required this.sidebarWidth,
   });
 
   @override
@@ -361,13 +403,14 @@ class DrawingPainter extends CustomPainter {
     } else if (imageAlignment == Alignment.topCenter) {
       offset = Offset((size.width - scaledWidth) / 2, 0);
     } else if (imageAlignment == Alignment.topRight) {
-      offset = Offset(size.width - scaledWidth, 0);
+      offset = Offset(size.width - scaledWidth - sidebarWidth, 0);
     }
 
     // Resmi çizme
     canvas.drawImageRect(
       backgroundImage,
-      Rect.fromLTRB(0, 0, backgroundImage.width.toDouble(), backgroundImage.height.toDouble()),
+      Rect.fromLTRB(0, 0, backgroundImage.width.toDouble(),
+          backgroundImage.height.toDouble()),
       Rect.fromLTWH(offset.dx, offset.dy, scaledWidth, scaledHeight),
       Paint(),
     );
