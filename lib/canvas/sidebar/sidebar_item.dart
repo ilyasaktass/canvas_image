@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 class SidebarItem {
   final Icon icon;
   final VoidCallback onPressed;
-  final bool isSelected;
+  bool isSelected;
   final Icon? selectedIcon;
   final Color? color;
+  Color? selectedColor = Colors.white;
 
   SidebarItem({
     required this.icon,
@@ -12,5 +13,6 @@ class SidebarItem {
     this.isSelected = false,
     this.selectedIcon,
     this.color,
+    this.selectedColor
   });
 }

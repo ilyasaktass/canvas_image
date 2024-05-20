@@ -35,12 +35,6 @@ class _DrawingBoardState extends State<DrawingBoard> {
     'assets/image5.png',
   ];
 
-  ui.PictureRecorder? _recorder;
-  Canvas? _canvas;
-  ui.Picture? _picture;
-  bool _isRecording = false;
-  final double _sidebarWidth = sidebarWidth;
-
   @override
   void initState() {
     super.initState();
@@ -88,13 +82,11 @@ class _DrawingBoardState extends State<DrawingBoard> {
       setState(() {
         _historyIndex--;
         _currentShapes = List.from(_shapesHistory[_historyIndex]);
-        _redrawFromHistory();
       });
     } else if (_historyIndex == 0) {
       setState(() {
         _historyIndex--;
         _currentShapes = [];
-        _redrawFromHistory();
       });
     }
   }
@@ -104,20 +96,7 @@ class _DrawingBoardState extends State<DrawingBoard> {
       setState(() {
         _historyIndex++;
         _currentShapes = List.from(_shapesHistory[_historyIndex]);
-        _redrawFromHistory();
       });
-    }
-  }
-
-  void _redrawFromHistory() {
-    if (_recorder != null && _canvas != null) {
-      _recorder = ui.PictureRecorder();
-      _canvas = Canvas(_recorder!);
-      for (var shape in _currentShapes) {
-        _drawShape(shape);
-      }
-      _picture = _recorder?.endRecording();
-      setState(() {});
     }
   }
 
@@ -164,7 +143,6 @@ class _DrawingBoardState extends State<DrawingBoard> {
       _shapesHistory = [];
       _currentShapes = [];
       _historyIndex = -1;
-      _picture = null;
     });
   }
 
@@ -189,10 +167,6 @@ class _DrawingBoardState extends State<DrawingBoard> {
       setState(() {
         _currentShapes.add(DrawnShape(point, point, _drawingMode,
             _selectedColor, _isFilled, _strokeWidth));
-        _isRecording = true;
-        _recorder = ui.PictureRecorder();
-        _canvas = Canvas(_recorder!);
-        _drawShape(_currentShapes.last);
       });
     }
   }
@@ -204,15 +178,12 @@ class _DrawingBoardState extends State<DrawingBoard> {
     setState(() {
       if (_drawingMode == DrawingMode.eraser) {
         _currentShapes.removeWhere((shape) => _isPointInShape(point, shape));
-        _redrawFromHistory();
       } else if (_startPoint != null) {
         if (_drawingMode == DrawingMode.pen) {
           _currentShapes.add(DrawnShape(_currentShapes.last.end, point,
               _drawingMode, _selectedColor, _isFilled, _strokeWidth));
-          _drawShape(_currentShapes.last);
         } else {
           _currentShapes.last.end = point;
-          _redrawFromHistory();
         }
       }
     });
@@ -227,10 +198,6 @@ class _DrawingBoardState extends State<DrawingBoard> {
       _shapesHistory = _shapesHistory.sublist(0, _historyIndex + 1);
       _shapesHistory.add(List.from(_currentShapes));
       _historyIndex++;
-    }
-    if (_isRecording) {
-      _picture = _recorder?.endRecording();
-      _isRecording = false;
     }
     setState(() {});
   }
@@ -252,40 +219,6 @@ class _DrawingBoardState extends State<DrawingBoard> {
         return false;
     }
   }
-
-  void _drawShape(DrawnShape shape) {
-    if (_canvas == null) return;
-    Paint paint = Paint()
-      ..strokeCap = StrokeCap.round
-      ..strokeWidth = shape.strokeWidth
-      ..color = shape.color
-      ..style = shape.isFilled ? PaintingStyle.fill : PaintingStyle.stroke;
-
-    // Çizimleri direkt canvas üzerinde çizme
-    Offset scaledStart = shape.start;
-    Offset scaledEnd = shape.end;
-
-    switch (shape.mode) {
-      case DrawingMode.pen:
-        _canvas!.drawLine(scaledStart, scaledEnd, paint);
-        break;
-      case DrawingMode.rectangle:
-        _canvas!.drawRect(Rect.fromPoints(scaledStart, scaledEnd), paint);
-        break;
-      case DrawingMode.circle:
-        double radius = (scaledStart - scaledEnd).distance / 2;
-        Offset center = (scaledStart + scaledEnd) / 2;
-        _canvas!.drawCircle(center, radius, paint);
-        break;
-      case DrawingMode.line:
-        _canvas!.drawLine(scaledStart, scaledEnd, paint);
-        break;
-      // Polygon drawing can be added here.
-      default:
-        break;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -305,8 +238,7 @@ class _DrawingBoardState extends State<DrawingBoard> {
                           backgroundImage: backgroundImage!,
                           zoomLevel: _zoomLevel,
                           imageAlignment: _imageAlignment,
-                          picture: _picture,
-                          sidebarWidth: _sidebarWidth,
+                          sidebarWidth: sidebarWidth,
                         ),
                         size: Size.infinite,
                       ),
@@ -318,7 +250,7 @@ class _DrawingBoardState extends State<DrawingBoard> {
             bottom: 0,
             right: 0,
             child: Container(
-              width: _sidebarWidth, // Sidebar width
+              width: sidebarWidth, // Sidebar width
               decoration: BoxDecoration(
                 color: const ui.Color.fromARGB(
                     255, 180, 170, 170), // Color moved to BoxDecoration
@@ -378,7 +310,6 @@ class DrawingPainter extends CustomPainter {
   final ui.Image backgroundImage;
   final double zoomLevel;
   final Alignment imageAlignment;
-  final ui.Picture? picture;
   final double sidebarWidth;
 
   DrawingPainter({
@@ -386,7 +317,6 @@ class DrawingPainter extends CustomPainter {
     required this.backgroundImage,
     required this.zoomLevel,
     required this.imageAlignment,
-    this.picture,
     required this.sidebarWidth,
   });
 
@@ -415,10 +345,6 @@ class DrawingPainter extends CustomPainter {
       Paint(),
     );
 
-    if (picture != null) {
-      canvas.drawPicture(picture!);
-    }
-
     for (var shape in shapes) {
       Paint paint = Paint()
         ..strokeCap = StrokeCap.round
@@ -426,7 +352,6 @@ class DrawingPainter extends CustomPainter {
         ..color = shape.color
         ..style = shape.isFilled ? PaintingStyle.fill : PaintingStyle.stroke;
 
-      // Çizimleri direkt canvas üzerinde çizme
       Offset scaledStart = shape.start;
       Offset scaledEnd = shape.end;
 
@@ -445,7 +370,6 @@ class DrawingPainter extends CustomPainter {
         case DrawingMode.line:
           canvas.drawLine(scaledStart, scaledEnd, paint);
           break;
-        // Polygon drawing can be added here.
         default:
           break;
       }
