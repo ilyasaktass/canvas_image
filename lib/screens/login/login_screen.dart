@@ -1,3 +1,4 @@
+import 'package:canvas_image/constants/constants.dart';
 import 'package:canvas_image/services/api_services.dart';
 import 'package:canvas_image/widgets/custom_text_field.dart';
 import 'package:flutter/material.dart';
@@ -38,7 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Adv Dijital Çözüm Uygulaması'),
-        backgroundColor: Colors.red,
+        backgroundColor: appBarBackgroundColor,
         foregroundColor: Colors.white,
       ),
       body: Center(
