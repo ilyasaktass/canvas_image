@@ -1,6 +1,3 @@
-// lib/models/user.dart
-import 'dart:convert';
-
 class User {
   final String accessToken;
   final String refreshToken;
