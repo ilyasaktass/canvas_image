@@ -36,7 +36,7 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> login(String email, String password) async {
-    return await requestHandler(
+    final result = await requestHandler(
       request: () => http.post(
         Uri.parse('$_baseUrl/login'),
         headers: <String, String>{
@@ -52,6 +52,13 @@ class ApiService {
       loadingMessage: 'Giriş yapılıyor...',
       successMessage: 'Giriş başarılı',
     );
+
+    if (result['success']) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('access_token', result['data']['access_token']);
+    }
+
+    return result;
   }
 
   static Future<Map<String, dynamic>> getUserProfile() async {
