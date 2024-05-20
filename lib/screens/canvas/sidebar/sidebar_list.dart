@@ -1,4 +1,4 @@
-import 'package:canvas_image/canvas/sidebar/sidebar_item.dart';
+import 'package:canvas_image/screens/canvas/sidebar/sidebar_item.dart';
 import 'package:flutter/material.dart';
 class SidebarList extends StatelessWidget {
   final List<SidebarItem> items;

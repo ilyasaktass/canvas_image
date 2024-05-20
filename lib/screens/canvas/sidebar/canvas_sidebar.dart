@@ -1,10 +1,10 @@
-import 'package:canvas_image/canvas/models/menu_selected_items.dart';
-import 'package:canvas_image/canvas/sidebar/sidebar_item.dart';
-import 'package:canvas_image/canvas/sidebar/sidebar_list.dart';
+import 'package:canvas_image/screens/canvas/models/menu_selected_items.dart';
+import 'package:canvas_image/screens/canvas/sidebar/sidebar_item.dart';
+import 'package:canvas_image/screens/canvas/sidebar/sidebar_list.dart';
 import 'package:canvas_image/components/modal_widget.dart';
 import 'package:canvas_image/constants/constants.dart';
 import 'package:canvas_image/enum/enums.dart';
-import 'package:canvas_image/record_screen/record_screen.dart';
+import 'package:canvas_image/screens/canvas/record_screen/record_screen.dart';
 import 'package:flutter/material.dart';
 
 class CanvasSidebar extends StatefulWidget {

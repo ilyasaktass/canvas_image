@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:ui';
-
-import 'package:canvas_image/canvas/canvas_view.dart';
+import 'package:canvas_image/screens/home/home_screen.dart';
+import 'package:canvas_image/screens/login/login_screen.dart';
+import 'package:canvas_image/screens/login/splash_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 
@@ -57,7 +58,11 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: const DrawingBoard(),
+      home:  const SplashScreen(),
+       routes: {
+        '/login': (context) => const LoginScreen(),
+        '/home': (context) => const HomeScreen(),
+      },
       builder: EasyLoading.init(),
     );
   }

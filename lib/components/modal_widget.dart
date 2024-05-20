@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:canvas_image/canvas/models/menu_selected_items.dart';
+import 'package:canvas_image/screens/canvas/models/menu_selected_items.dart';
 
 class CustomModal extends StatelessWidget {
   final double top;
