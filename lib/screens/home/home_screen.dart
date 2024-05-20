@@ -1,4 +1,7 @@
 // lib/screens/home_screen.dart
+import 'package:canvas_image/constants/constants.dart';
+import 'package:canvas_image/models/classes.dart';
+import 'package:canvas_image/screens/home/classes_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:canvas_image/models/user.dart';
 import 'package:canvas_image/services/api_services.dart';
@@ -16,12 +19,13 @@ class HomeScreen extends StatelessWidget {
     // Giriş ekranına yönlendirme
     Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Ana Sayfa'),
+        title: const Text('Adv Dijital Çözüm Uygulaması'),
+        backgroundColor: appBarBackgroundColor,
+        foregroundColor: Colors.white,
       ),
       drawer: Drawer(
         child: ListView(
@@ -74,12 +78,9 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.home),
-              title: const Text('Ana Sayfa'),
-              onTap: () {
-                Navigator.pop(context);
-                // Anasayfa'ya gitmek için kod
-              },
+              leading: const Icon(Icons.book),
+              title: const Text('Kitaplarım'),
+              onTap: () => {},
             ),
             ListTile(
               leading: const Icon(Icons.settings),
@@ -97,9 +98,7 @@ class HomeScreen extends StatelessWidget {
           ],
         ),
       ),
-      body: const Center(
-        child: Text('Anasayfa ya hoşgeldiniz!'),
-      ),
+      body: const ClassesScreen()
     );
   }
 }

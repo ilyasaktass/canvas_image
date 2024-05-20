@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'package:canvas_image/models/user.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
   @override
   State<StatefulWidget> createState() {
-   return _SplashScreenState();
+    return _SplashScreenState();
   }
 }
 
@@ -18,13 +20,16 @@ class _SplashScreenState extends State<SplashScreen> {
 
   void _checkLoginStatus() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token');
+    final userJson = prefs.getString('user');
 
-    if (token != null) {
-      Navigator.pushReplacementNamed(context, '/home');
-    } else {
-      Navigator.pushReplacementNamed(context, '/login');
+    if (userJson != null) {
+      User user = User.fromJson(jsonDecode(userJson));
+      if (user.accessToken.isNotEmpty) {
+        Navigator.pushReplacementNamed(context, '/home');
+        return;
+      }
     }
+    Navigator.pushReplacementNamed(context, '/login');
   }
 
   @override

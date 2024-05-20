@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:canvas_image/models/classes.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
@@ -36,7 +37,8 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> login(String email, String password) async {
+  static Future<Map<String, dynamic>> login(
+      String email, String password) async {
     final result = await requestHandler(
       request: () => http.post(
         Uri.parse('$_baseUrl/login'),
@@ -74,6 +76,41 @@ class ApiService {
 
   static Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();  // Tüm bilgileri temizle
+    await prefs.clear(); // Tüm bilgileri temizle
+  }
+
+  static Future<Classes?> getClasses() async {
+    final prefs = await SharedPreferences.getInstance();
+    String? token;
+    final userJson = prefs.getString('user');
+
+    if (userJson != null) {
+      User user = User.fromJson(jsonDecode(userJson));
+      if (user.accessToken.isNotEmpty) {
+        token = user.accessToken;
+      }
+    }
+
+    if (token == null) {
+      EasyLoading.showError('Token bulunamadı, lütfen tekrar giriş yapın.');
+      return null;
+    }
+
+    final result = await requestHandler(
+      request: () => http.get(
+        Uri.parse('$_baseUrl/MobileSolution/GetAppClasses'),
+        headers: <String, String>{
+          'Authorization': 'Bearer $token',
+        },
+      ),
+      loadingMessage: 'Dersler yükleniyor...',
+    );
+
+    if (result['success']) {
+      return Classes.fromJson(result['data']);
+    } else {
+      EasyLoading.showError(result['error']);
+      return null;
+    }
   }
 }
