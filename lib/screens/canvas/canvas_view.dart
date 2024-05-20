@@ -1,5 +1,5 @@
 import 'dart:ui' as ui;
-import 'package:canvas_image/canvas/sidebar/canvas_sidebar.dart';
+import 'package:canvas_image/screens/canvas/sidebar/canvas_sidebar.dart';
 import 'package:canvas_image/constants/constants.dart';
 import 'package:canvas_image/enum/enums.dart';
 import 'package:flutter/material.dart';
