@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
+import 'package:canvas_image/models/user.dart';
 
 class ApiService {
   static const String _baseUrl = 'https://advdijital.com/api';
@@ -55,25 +56,24 @@ class ApiService {
 
     if (result['success']) {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('access_token', result['data']['access_token']);
+      User user = User.fromJson(result['data']);
+      await prefs.setString('user', jsonEncode(user.toJson()));
     }
 
     return result;
   }
 
-  static Future<Map<String, dynamic>> getUserProfile() async {
+  static Future<User?> getUserProfile() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('access_token') ?? '';
+    final userJson = prefs.getString('user');
+    if (userJson != null) {
+      return User.fromJson(jsonDecode(userJson));
+    }
+    return null;
+  }
 
-    return await requestHandler(
-      request: () => http.get(
-        Uri.parse('$_baseUrl/user/profile'),
-        headers: <String, String>{
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      ),
-      loadingMessage: 'Profil yükleniyor...',
-    );
+  static Future<void> logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();  // Tüm bilgileri temizle
   }
 }
