@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:canvas_image/models/books.dart';
 import 'package:canvas_image/models/classes.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -37,8 +38,7 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> login(
-      String email, String password) async {
+  static Future<Map<String, dynamic>> login(String email, String password) async {
     final result = await requestHandler(
       request: () => http.post(
         Uri.parse('$_baseUrl/login'),
@@ -103,11 +103,47 @@ class ApiService {
           'Authorization': 'Bearer $token',
         },
       ),
-      loadingMessage: 'Dersler yükleniyor...',
+      loadingMessage: 'Sınıflar yükleniyor...',
     );
 
     if (result['success']) {
       return Classes.fromJson(result['data']);
+    } else {
+      EasyLoading.showError(result['error']);
+      return null;
+    }
+  }
+
+  static Future<Books?> getBooks(int classId, bool showUserFavoriteBooks) async {
+    final prefs = await SharedPreferences.getInstance();
+    String? token;
+    final userJson = prefs.getString('user');
+
+    if (userJson != null) {
+      User user = User.fromJson(jsonDecode(userJson));
+      if (user.accessToken.isNotEmpty) {
+        token = user.accessToken;
+      }
+    }
+
+    if (token == null) {
+      EasyLoading.showError('Token bulunamadı, lütfen tekrar giriş yapın.');
+      return null;
+    }
+
+    final result = await requestHandler(
+      request: () => http.get(
+        Uri.parse('$_baseUrl/MobileSolution/GetBooks?classId=$classId&showUserFavoriteBooks=$showUserFavoriteBooks'),
+        headers: <String, String>{
+          'Authorization': 'Bearer $token',
+        },
+      ),
+      loadingMessage: 'Kitaplar yükleniyor...',
+    );
+
+    if (result['success']) {
+      print(result);
+      return Books.fromJson(result['data']);
     } else {
       EasyLoading.showError(result['error']);
       return null;

@@ -1,5 +1,6 @@
-import 'package:canvas_image/models/classes.dart';
+import 'package:canvas_image/screens/home/books_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:canvas_image/models/classes.dart';
 import 'package:canvas_image/services/api_services.dart';
 
 class ClassesScreen extends StatefulWidget {
@@ -18,6 +19,22 @@ class _ClassesScreenState extends State<ClassesScreen> {
   void initState() {
     super.initState();
     _classesFuture = ApiService.getClasses();
+  }
+
+  Future<void> _getBooksAndNavigate(int classId, bool showUserFavoriteBooks) async {
+    final booksResponse = await ApiService.getBooks(classId, showUserFavoriteBooks);
+    if (booksResponse != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => BooksScreen(books: booksResponse.books),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content:  Text('Kitaplar yüklenemedi.')),
+      );
+    }
   }
 
   @override
@@ -52,9 +69,7 @@ class _ClassesScreenState extends State<ClassesScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    onTap: () {
-                      print('Burasına tıklayınca kitaplar ekranına gidecek');
-                    },
+                    onTap: () => _getBooksAndNavigate(classItem.id, true),
                   ),
                 );
               },
